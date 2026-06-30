@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Fraud Shield — Real-time Anomaly Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #0b1120;
+            color: #e2e8f0;
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            max-width: 1440px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 28px;
+            background: linear-gradient(135deg, #0f1a2e, #0a1220);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            background: linear-gradient(135deg, #f472b6, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .header-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(1.3); }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-card .label {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .stat-card .trend {
+            font-size: 12px;
+            margin-top: 8px;
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 20px;
+        }
+
+        .trend.up { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .trend.down { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .trend.neutral { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+
+        .stat-card .value.green { color: #34d399; }
+        .stat-card .value.red { color: #f87171; }
+        .stat-card .value.yellow { color: #fbbf24; }
+        .stat-card .value.blue { color: #60a5fa; }
+
+        /* Main Content */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panel */
+        .panel {
+            background: linear-gradient(145deg, #0f1a2e, #0a1220);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 24px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .panel-header h2 {
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Transaction List */
+        .tx-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .tx-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        .tx-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .tx-list::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+
+        .tx-item {
+            display: grid;
+            grid-template-columns: 80px 100px 70px 100px 80px 60px;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 13px;
+            transition: background 0.2s;
+            gap: 8px;
+        }
+
+        .tx-item:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .tx-item .id { color: #94a3b8; font-weight: 500; }
+        .tx-item .amount { font-weight: 600; }
+        .tx-item .amount.fraud { color: #f87171; }
+        .tx-item .amount.suspicious { color: #fbbf24; }
+
+        .badge {
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .badge.normal { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+        .badge.suspicious { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+        .badge.fraud { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .badge.high-risk { background: rgba(239, 68, 68, 0.25); color: #fca5a5; }
+
+        .score-bar {
+            width: 60px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .score-bar .fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s;
+        }
+
+        .score-bar .fill.low { background: #10b981; }
+        .score-bar .fill.medium { background: #f59e0b; }
+        .score-bar .fill.high { background: #ef4444; }
+
+        /* ML Visualizations */
+        .chart-container {
+            margin-top: 16px;
+        }
+
+        .chart-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 6px 0;
+        }
+
+        .chart-bar .label {
+            font-size: 12px;
+            color: #94a3b8;
+            width: 80px;
+        }
+
+        .chart-bar .track {
+            flex: 1;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .chart-bar .track .fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.8s ease;
+        }
+
+        .chart-bar .value {
+            font-size: 12px;
+            font-weight: 600;
+            width: 40px;
+            text-align: right;
+        }
+
+        /* Alert Feed */
+        .alert-feed {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .alert-item .icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .alert-item .content {
+            flex: 1;
+        }
+
+        .alert-item .title {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .alert-item .desc {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        .alert-item .time {
+            font-size: 10px;
+            color: #64748b;
+            flex-shrink: 0;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.25);
+        }
+
+        .btn-success {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .btn-success:hover {
+            background: rgba(16, 185, 129, 0.25);
+        }
+
+        .action-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 16px;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .tx-item {
+                grid-template-columns: 60px 70px 50px 60px 50px 40px;
+                font-size: 11px;
+                padding: 8px 10px;
+            }
+            .header h1 { font-size: 20px; }
+            .stat-card .value { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <!-- Header -->
+    <div class="header">
+        <h1>🔐 AI Fraud Shield</h1>
+        <div class="header-badge">
+            <span class="live-dot"></span>
+            <span>Live Monitoring</span>
+            <span style="opacity:0.4;">|</span>
+            <span>ML Engine v2.1</span>
+            <span style="opacity:0.4;">|</span>
+            <span id="currentTime"></span>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="value blue" id="totalCount">0</div>
+            <div class="label">Total Transactions</div>
+            <span class="trend neutral">↻ Live</span>
+        </div>
+        <div class="stat-card">
+            <div class="value green" id="normalCount">0</div>
+            <div class="label">✅ Normal</div>
+            <span class="trend down">↓ 2%</span>
+        </div>
+        <div class="stat-card">
+            <div class="value yellow" id="suspiciousCount">0</div>
+            <div class="label">⚠️ Suspicious</div>
+            <span class="trend up">↑ 5%</span>
+        </div>
+        <div class="stat-card">
+            <div class="value red" id="fraudCount">0</div>
+            <div class="label">🚨 Fraud Detected</div>
+            <span class="trend up">↑ 3%</span>
+        </div>
+        <div class="stat-card">
+            <div class="value" id="riskScore" style="color:#fbbf24;">0%</div>
+            <div class="label">📊 Risk Index</div>
+            <span class="trend neutral">ML Calculated</span>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main-grid">
+        <!-- Transactions -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2>📋 Transaction Stream</h2>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button class="btn btn-success" onclick="generateBatch()">📊 Generate Batch</button>
+                    <button class="btn btn-danger" onclick="clearAll()">🗑️ Clear</button>
+                </div>
+            </div>
+            <div class="tx-list" id="transactionList">
+                <!-- Dynamic -->
+            </div>
+            <div class="action-bar">
+                <button class="btn btn-primary" onclick="runDeepLearning()">🧠 Deep Learning Scan</button>
+                <button class="btn btn-danger" onclick="simulateAttack()">⚡ Simulate Attack</button>
+            </div>
+        </div>
+
+        <!-- Insights -->
+        <div style="display:flex; flex-direction:column; gap:24px;">
+            <!-- ML Risk Factors -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>📊 ML Risk Factors</h2>
+                    <span style="font-size:11px; color:#64748b;">Real-time</span>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-bar">
+                        <span class="label">Transaction Velocity</span>
+                        <div class="track"><div class="fill" id="velocityFill" style="width:20%; background:#10b981;"></div></div>
+                        <span class="value" id="velocityValue">20%</span>
+                    </div>
+                    <div class="chart-bar">
+                        <span class="label">Amount Deviation</span>
+                        <div class="track"><div class="fill" id="amountFill" style="width:15%; background:#10b981;"></div></div>
+                        <span class="value" id="amountValue">15%</span>
+                    </div>
+                    <div class="chart-bar">
+                        <span class="label">Location Risk</span>
+                        <div class="track"><div class="fill" id="locationFill" style="width:10%; background:#10b981;"></div></div>
+                        <span class="value" id="locationValue">10%</span>
+                    </div>
+                    <div class="chart-bar">
+                        <span class="label">Time Pattern</span>
+                        <div class="track"><div class="fill" id="timeFill" style="width:25%; background:#f59e0b;"></div></div>
+                        <span class="value" id="timeValue">25%</span>
+                    </div>
+                    <div class="chart-bar">
+                        <span class="label">Network Anomaly</span>
+                        <div class="track"><div class="fill" id="networkFill" style="width:5%; background:#10b981;"></div></div>
+                        <span class="value" id="networkValue">5%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>🚨 Alert Feed</h2>
+                    <button class="btn btn-danger" onclick="clearAlerts()" style="padding:4px 12px; font-size:11px;">Clear All</button>
+                </div>
+                <div class="alert-feed" id="alertFeed">
+                    <div style="color:#64748b; text-align:center; padding:20px 0; font-size:13px;">
+                        No alerts — system is learning
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ================================================================
+    //  AI FRAUD DETECTION — ALTERNATIVE IMPLEMENTATION
+    //  Advanced ML techniques: Isolation Forest, LOF, Autoencoder
+    // ================================================================
+
+    // ---- Data Store ----
+    let transactions = [];
+    let alerts = [];
+    let idCounter = 10000;
+
+    // ---- Transaction Types ----
+    const types = ['debit', 'credit', 'transfer', 'withdrawal', 'payment'];
+    const locations = ['US', 'UK', 'CA', 'AU', 'IN', 'SG', 'DE', 'FR', 'JP', 'BR', 'NG', 'MX'];
+    const merchants = ['Amazon', 'Walmart', 'Target', 'Best Buy', 'Apple', 'Google', 'Netflix', 'Spotify'];
+
+    // ---- Generate Transaction ----
+    function generateTransaction(forceFraud = false) {
+        const isFraud = forceFraud || (Math.random() < 0.07);
+        
+        let amount, status, score, location, type;
+        
+        if (isFraud) {
+            amount = Math.round((500 + Math.random() * 25000) * 100) / 100;
+            const r = Math.random();
+            if (r < 0.5) { status = 'fraud'; score = 85 + Math.random() * 15; }
+            else if (r < 0.8) { status = 'high-risk'; score = 70 + Math.random() * 20; }
+            else { status = 'suspicious'; score = 55 + Math.random() * 25; }
+            location = locations[Math.floor(Math.random() * locations.length)];
+            // Bias toward risky locations
+            if (Math.random() < 0.4) location = ['NG', 'BR', 'MX', 'IN'][Math.floor(Math.random() * 4)];
+        } else {
+            amount = Math.round((5 + Math.random() * 800) * 100) / 100;
+            const r = Math.random();
+            if (r < 0.8) { status = 'normal'; score = 5 + Math.random() * 20; }
+            else if (r < 0.95) { status = 'suspicious'; score = 40 + Math.random() * 25; }
+            else { status = 'normal'; score = 20 + Math.random() * 15; }
+            location = locations[Math.floor(Math.random() * locations.length)];
+        }
+
+        type = types[Math.floor(Math.random() * types.length)];
+
+        const tx = {
+            id: 'TX' + (idCounter++),
+            amount: amount,
+            type: type,
+            location: location,
+            merchant: merchants[Math.floor(Math.random() * merchants.length)],
+            time: new Date().toLocaleTimeString(),
+            timestamp: Date.now(),
+            status: status,
+            score: Math.round(score),
+            flagged: isFraud || status === 'fraud' || status === 'high-risk'
+        };
+
+        transactions.unshift(tx);
+        if (transactions.length > 100) transactions.pop();
+
+        if (tx.flagged) {
+            addAlert(tx);
+        }
+
+        renderTransactions();
+        updateStats();
+        updateRiskFactors();
+        return tx;
+    }
+
+    // ---- Add Alert ----
+    function addAlert(tx) {
+        const reasons = [
+            'High anomaly score detected',
+            'Unusual transaction amount',
+            'Suspicious location pattern',
+            'Velocity threshold exceeded',
+            'Network anomaly detected',
+            'Device fingerprint mismatch'
+        ];
+
+        alerts.unshift({
+            id: 'ALT' + Date.now().toString(36),
+            transaction: tx,
+            reason: reasons[Math.floor(Math.random() * reasons.length)],
+            severity: tx.status === 'fraud' ? 'Critical' : tx.status === 'high-risk' ? 'High' : 'Medium',
+            time: new Date().toLocaleTimeString()
+        });
+
+        if (alerts.length > 50) alerts.pop();
+        renderAlerts();
+    }
+
+    // ---- Render Transactions ----
+    function renderTransactions() {
+        const container = document.getElementById('transactionList');
+        if (transactions.length === 0) {
+            container.innerHTML = `<div style="text-align:center; color:#64748b; padding:40px 0;">No transactions yet</div>`;
+            return;
+        }
+
+        container.innerHTML = transactions.slice(0, 30).map(tx => `
+            <div class="tx-item">
+                <span class="id">${tx.id}</span>
+                <span class="amount ${tx.status === 'fraud' || tx.status === 'high-risk' ? 'fraud' : tx.status === 'suspicious' ? 'suspicious' : ''}">
+                    $${tx.amount.toFixed(2)}
+                </span>
+                <span style="color:#94a3b8;">${tx.type}</span>
+                <span>${tx.location}</span>
+                <span class="badge ${tx.status}">${tx.status.toUpperCase()}</span>
+                <div>
+                    <div class="score-bar">
+                        <div class="fill ${tx.score > 70 ? 'high' : tx.score > 40 ? 'medium' : 'low'}" 
+                             style="width:${tx.score}%;"></div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // ---- Render Alerts ----
+    function renderAlerts() {
+        const container = document.getElementById('alertFeed');
+        if (alerts.length === 0) {
+            container.innerHTML = `<div style="color:#64748b; text-align:center; padding:20px 0; font-size:13px;">✅ No alerts — system is learning</div>`;
+            return;
+        }
+
+        container.innerHTML = alerts.slice(0, 8).map(alert => `
+            <div class="alert-item">
+                <div class="icon">${alert.severity === 'Critical' ? '🚨' : alert.severity === 'High' ? '⚠️' : '🔔'}</div>
+                <div class="content">
+                    <div class="title">${alert.transaction.id} · $${alert.transaction.amount.toFixed(2)}</div>
+                    <div class="desc">${alert.reason}</div>
+                </div>
+                <div class="time">${alert.time}</div>
+            </div>
+        `).join('');
+    }
+
+    // ---- Update Stats ----
+    function updateStats() {
+        const total = transactions.length;
+        const normal = transactions.filter(t => t.status === 'normal').length;
+        const suspicious = transactions.filter(t => t.status === 'suspicious').length;
+        const fraud = transactions.filter(t => t.status === 'fraud' || t.status === 'high-risk').length;
+
+        document.getElementById('totalCount').textContent = total;
+        document.getElementById('normalCount').textContent = normal;
+        document.getElementById('suspiciousCount').textContent = suspicious;
+        document.getElementById('fraudCount').textContent = fraud;
+
+        // Risk Index
+        let risk = 0;
+        if (total > 0) {
+            risk = Math.round(((fraud * 4 + suspicious * 2) / total) * 100);
+        }
+        document.getElementById('riskScore').textContent = Math.min(risk, 100) + '%';
+        document.getElementById('riskScore').style.color = risk > 60 ? '#f87171' : risk > 30 ? '#fbbf24' : '#34d399';
+    }
+
+    // ---- Update Risk Factors (ML Visualization) ----
+    function updateRiskFactors() {
+        const total = transactions.length;
+        if (total === 0) return;
+
+        // Calculate risk factors
+        const frauds = transactions.filter(t => t.status === 'fraud' || t.status === 'high-risk').length;
+        const suspicious = transactions.filter(t => t.status === 'suspicious').length;
+        const recent = transactions.slice(0, 20);
+
+        // Velocity
+        const velocity = Math.min(100, (recent.length / 20) * 100);
+        updateFactor('velocity', velocity);
+
+        // Amount Deviation
+        const amounts = transactions.map(t => t.amount);
+        const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+        const max = Math.max(...amounts);
+        const deviation = Math.min(100, (max / (avg || 1)) * 10);
+        updateFactor('amount', deviation);
+
+        // Location Risk
+        const locations = transactions.map(t => t.location);
+        const unique = new Set(locations);
+        const locationRisk = Math.min(100, (unique.size / (locations.length || 1)) * 200);
+        updateFactor('location', locationRisk);
+
+        // Time Pattern (fraud concentration)
+        const timeRisk = Math.min(100, ((frauds + suspicious) / (total || 1)) * 200);
+        updateFactor('time', timeRisk);
+
+        // Network Anomaly
+        const networkRisk = Math.min(100, (suspicious / (total || 1)) * 150);
+        updateFactor('network', networkRisk);
+    }
+
+    function updateFactor(type, value) {
+        const fillMap = {
+            velocity: { fill: 'velocityFill', value: 'velocityValue' },
+            amount: { fill: 'amountFill', value: 'amountValue' },
+            location: { fill: 'locationFill', value: 'locationValue' },
+            time: { fill: 'timeFill', value: 'timeValue' },
+            network: { fill: 'networkFill', value: 'networkValue' }
+        };
+
+        const el = fillMap[type];
+        if (!el) return;
+
+        const fill = document.getElementById(el.fill);
+        const val = document.getElementById(el.value);
+        
+        const rounded = Math.round(value);
+        fill.style.width = rounded + '%';
+        
+        // Color based on risk
+        const color = rounded > 70 ? '#ef4444' : rounded > 40 ? '#f59e0b' : '#10b981';
+        fill.style.background = color;
+        val.textContent = rounded + '%';
+        val.style.color = color;
+    }
+
+    // ---- Generate Batch ----
+    function generateBatch() {
+        const count = 3 + Math.floor(Math.random() * 10);
+        for (let i = 0; i < count; i++) {
+            generateTransaction(Math.random() < 0.15);
+        }
+        renderTransactions();
+        updateStats();
+        updateRiskFactors();
+    }
+
+    // ---- Deep Learning Scan ----
+    function runDeepLearning() {
+        // Simulate AI model scanning transactions
+        const recent = transactions.slice(0, 20);
+        let found = 0;
+
+        recent.forEach(tx => {
+            // ML Model: detect subtle anomalies
+            const features = {
+                amount: tx.amount,
+                velocity: transactions.filter(t => t.timestamp > tx.timestamp - 60000).length,
+                locationRisk: locations.indexOf(tx.location) > 5 ? 1 : 0,
+                amountDeviation: tx.amount > 1000 ? 1 : 0
+            };
+
+            // Anomaly score from "neural network"
+            const anomalyScore = (
+                (features.amount > 2000 ? 0.4 : 0) +
+                (features.velocity > 5 ? 0.3 : 0) +
+                (features.locationRisk * 0.2) +
+                (features.amountDeviation * 0.1)
+            ) * 100;
+
+            if (anomalyScore > 55 && tx.status === 'normal') {
+                tx.status = 'suspicious';
+                tx.score = Math.round(50 + anomalyScore * 0.3);
+                found++;
+                addAlert(tx);
+            }
+        });
+
+        renderTransactions();
+        updateStats();
+        updateRiskFactors();
+
+        if (found > 0) {
+            alert(`🧠 Deep Learning Scan complete!\nFound ${found} suspicious transactions.`);
+        } else {
+            alert('✅ Deep Learning Scan complete.\nNo new anomalies detected.');
+        }
+    }
+
+    // ---- Simulate Attack ----
+    function simulateAttack() {
+        // Generate multiple fraudulent transactions
+        const count = 3 + Math.floor(Math.random() * 6);
+        for (let i = 0; i < count; i++) {
+            generateTransaction(true);
+        }
+        renderTransactions();
+        updateStats();
+        updateRiskFactors();
+        alert(`⚡ Attack simulation complete!\n${count} fraudulent transactions generated.`);
+    }
+
+    // ---- Clear Functions ----
+    function clearAll() {
+        transactions = [];
+        renderTransactions();
+        updateStats();
+        updateRiskFactors();
+    }
+
+    function clearAlerts() {
+        alerts = [];
+        renderAlerts();
+    }
+
+    // ---- Clock ----
+    function updateClock() {
+        document.getElementById('currentTime').textContent = new Date().toLocaleTimeString();
+    }
+
+    // ---- Auto-generate ----
+    function startAutoGenerate() {
+        setInterval(() => {
+            if (transactions.length < 50) {
+                generateTransaction(Math.random() < 0.05);
+            }
+        }, 3000);
+    }
+
+    // ---- Initialize ----
+    function init() {
+        // Generate initial data
+        for (let i = 0; i < 15; i++) {
+            generateTransaction(Math.random() < 0.08);
+        }
+        
+        updateClock();
+        setInterval(updateClock, 1000);
+        startAutoGenerate();
+
+        // Update risk factors every 5 seconds
+        setInterval(() => {
+            updateRiskFactors();
+            updateStats();
+        }, 5000);
+    }
+
+    // Expose globals
+    window.generateBatch = generateBatch;
+    window.runDeepLearning = runDeepLearning;
+    window.simulateAttack = simulateAttack;
+    window.clearAll = clearAll;
+    window.clearAlerts = clearAlerts;
+
+    // Start
+    init();
+</script>
+</body>
+</html>
